@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Day Trade Journal</title>
+  <title>Diário de Trade</title>
   <style>
     :root {
       --bg: #07111f;
@@ -66,6 +66,54 @@
     textarea { resize: vertical; min-height: 92px; }
     input:focus, textarea:focus, select:focus { outline: 2px solid rgba(56,189,248,0.25); border-color: var(--accent); }
 
+    .reason-field { position: relative; }
+    .reason-input-box {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+      min-height: 52px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--border);
+      background: var(--panel-2); transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .reason-input-box:focus-within {
+      border-color: var(--accent); outline: 2px solid rgba(56,189,248,0.25);
+    }
+    .reason-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+    .reason-tag {
+      display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
+      background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.35);
+      border-radius: 999px; font-size: 0.85rem; color: var(--text);
+    }
+    .reason-tag button {
+      width: auto; padding: 0; background: transparent; border: none; color: var(--text);
+      font-size: 1rem; line-height: 1; cursor: pointer; opacity: 0.8;
+    }
+    .reason-input-box input {
+      flex: 1 1 120px; min-width: 120px; padding: 0; border: none; background: transparent;
+      color: var(--text); font-size: 1rem; outline: none;
+    }
+    .reason-input-box input::placeholder { color: var(--muted); }
+    .reason-suggestions {
+      position: absolute; top: calc(100% + 8px); left: 0; right: 0;
+      display: none; z-index: 10; max-height: 220px; overflow-y: auto;
+      background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px;
+      box-shadow: 0 14px 26px rgba(0,0,0,0.18);
+      padding: 8px;
+    }
+    .reason-suggestions.active { display: grid; gap: 6px; }
+    .reason-option, .reason-empty {
+      width: 100%; text-align: left; padding: 10px 12px; border: none; border-radius: 10px;
+      background: rgba(255,255,255,0.03); color: var(--text); font-size: 0.96rem;
+    }
+    .reason-option { cursor: pointer; }
+    .reason-option:hover { background: rgba(56,189,248,0.14); }
+    .reason-empty { color: var(--muted); }
+
+    .delete-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 38px; height: 38px; border-radius: 10px; border: 1px solid rgba(239, 68, 68, 0.4);
+      background: rgba(239, 68, 68, 0.12); color: #fca5a5; font-size: 1.1rem;
+      padding: 0; min-width: auto; font-weight: 700;
+    }
+    .delete-btn:hover { background: rgba(239, 68, 68, 0.18); transform: translateY(-1px); }
+
     .actions { display: flex; gap: 10px; }
     button {
       cursor: pointer; font-weight: 700; transition: transform 0.2s ease, background 0.2s ease;
@@ -92,8 +140,26 @@
       padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.04);
     }
 
+    .section-header {
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      margin-bottom: 12px;
+    }
+    .section-header h2 {
+      margin: 0;
+    }
+    .filter-select {
+      min-width: 170px;
+      max-width: 220px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
     .insights-grid {
-      display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr));
+      display: grid; gap: 16px; grid-template-columns: repeat(3, minmax(0, 1fr));
       margin-top: 18px;
     }
     .insight-block {
@@ -102,6 +168,37 @@
     }
     .insight-block h3 {
       margin: 0 0 10px; font-size: 1rem;
+    }
+    .insight-block--drawdown {
+      display: grid; gap: 10px;
+    }
+    .drawdown-header {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .drawdown-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 5px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700;
+      letter-spacing: 0.04em; text-transform: uppercase;
+      border: 1px solid transparent;
+    }
+    .drawdown-badge.safe {
+      background: rgba(34, 197, 94, 0.12); color: #86efac; border-color: rgba(34, 197, 94, 0.35);
+    }
+    .drawdown-badge.warning {
+      background: rgba(245, 158, 11, 0.12); color: #fbbf24; border-color: rgba(245, 158, 11, 0.35);
+    }
+    .drawdown-badge.critical {
+      background: rgba(239, 68, 68, 0.12); color: #fca5a5; border-color: rgba(239, 68, 68, 0.35);
+    }
+    .drawdown-figure {
+      font-size: 1.55rem; font-weight: 800; line-height: 1.2; letter-spacing: -0.03em;
+    }
+    .drawdown-figure.safe { color: var(--green); }
+    .drawdown-figure.warning { color: #f59e0b; }
+    .drawdown-figure.critical { color: var(--red); }
+    .drawdown-mini {
+      width: 100%; height: 88px; display: block; background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border); border-radius: 10px; padding: 6px;
     }
     .insight-list {
       display: grid; gap: 8px;
@@ -135,7 +232,7 @@
   <div class="container">
     <header>
       <div class="title">
-        <h1>Journal de Day Trade</h1>
+        <h1>Diário de Day Trade</h1>
         <p>Cadastre cada operação e acompanhe seu desempenho mensal.</p>
       </div>
       <div class="pill" id="today">Hoje: --</div>
@@ -158,7 +255,19 @@
 
           <label>
             Motivo
-            <textarea id="reason" placeholder="Descreva o motivo da entrada/saída..." required></textarea>
+            <div class="reason-field">
+              <div id="reasonInputBox" class="reason-input-box">
+                <div id="reasonTags" class="reason-tags"></div>
+                <input
+                  id="reason"
+                  type="text"
+                  placeholder="Selecione ou digite os motivos..."
+                  autocomplete="off"
+                />
+                <input id="reasonHidden" type="hidden" required />
+              </div>
+              <div id="reasonSuggestions" class="reason-suggestions" aria-live="polite"></div>
+            </div>
           </label>
 
           <div class="row">
@@ -228,11 +337,28 @@
           <h3>Mais frequentes</h3>
           <div class="insight-list" id="topReasons"></div>
         </div>
+        <div class="insight-block insight-block--drawdown">
+          <div class="drawdown-header">
+            <h3 style="margin:0;">Drawdown</h3>
+            <span id="drawdownStatus" class="drawdown-badge safe">Saudável</span>
+          </div>
+          <div id="drawdownTotal" class="drawdown-figure safe">0,00%</div>
+          <div class="insight-list">
+            <div class="insight-item"><span>Máximo</span><strong id="maxDrawdown">0,00%</strong></div>
+            <div class="insight-item"><span>Atual</span><strong id="currentDrawdown">0,00%</strong></div>
+          </div>
+          <canvas id="drawdownChart" class="drawdown-mini"></canvas>
+        </div>
       </div>
     </section>
 
     <section class="card" style="margin-top:20px;">
-      <h2 style="margin-top:0">Operações cadastradas</h2>
+      <div class="section-header">
+        <h2 style="margin-top:0">Operações cadastradas</h2>
+        <select id="monthFilter" class="filter-select" aria-label="Filtrar por mês">
+          <option value="all">Todos os meses</option>
+        </select>
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
@@ -242,6 +368,7 @@
               <th>Tipo</th>
               <th>Motivo</th>
               <th>Resultado</th>
+              <th>Ações</th>
             </tr>
           </thead>
           <tbody id="operationsTable"></tbody>
@@ -261,8 +388,160 @@
     const currentMonth = document.getElementById('currentMonth');
     const todayLabel = document.getElementById('today');
     const clearDataBtn = document.getElementById('clearData');
+    const maxDrawdownEl = document.getElementById('maxDrawdown');
+    const currentDrawdownEl = document.getElementById('currentDrawdown');
+    const drawdownStatus = document.getElementById('drawdownStatus');
+    const drawdownTotal = document.getElementById('drawdownTotal');
+    const monthFilter = document.getElementById('monthFilter');
 
     const STORAGE_KEY = 'daytrade-operations';
+    const defaultReasonOptions = [
+      'Falha de topo',
+      'Falha de fundo',
+      'Padrão de candle',
+      'Pico de volume',
+      'Pullback',
+      'Romp LTA',
+      'Romp LTB',
+      'Teste em 61.8',
+    ];
+
+    const reasonInput = document.getElementById('reason');
+    const reasonHidden = document.getElementById('reasonHidden');
+    const reasonTags = document.getElementById('reasonTags');
+    const reasonSuggestions = document.getElementById('reasonSuggestions');
+    const selectedReasons = [];
+
+    function normalizeReason(value) {
+      return String(value || '').trim();
+    }
+
+    function syncReasonHidden() {
+      reasonHidden.value = selectedReasons.join(', ');
+    }
+
+    function syncReasonTags() {
+      reasonTags.innerHTML = '';
+
+      selectedReasons.forEach((reason) => {
+        const tag = document.createElement('div');
+        tag.className = 'reason-tag';
+
+        const label = document.createElement('span');
+        label.textContent = reason;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.setAttribute('aria-label', `Remover ${reason}`);
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', () => {
+          const index = selectedReasons.findIndex((item) => item.toLowerCase() === reason.toLowerCase());
+          if (index >= 0) selectedReasons.splice(index, 1);
+          syncReasonHidden();
+          syncReasonTags();
+          renderReasonSuggestions();
+          reasonInput.focus();
+        });
+
+        tag.appendChild(label);
+        tag.appendChild(removeBtn);
+        reasonTags.appendChild(tag);
+      });
+
+      syncReasonHidden();
+    }
+
+    function addReason(reason) {
+      const normalized = normalizeReason(reason);
+      if (!normalized) return false;
+
+      const alreadyAdded = selectedReasons.some((item) => item.toLowerCase() === normalized.toLowerCase());
+      if (!alreadyAdded) selectedReasons.push(normalized);
+
+      reasonInput.value = '';
+      syncReasonTags();
+      renderReasonSuggestions();
+      return true;
+    }
+
+    function finishDraftReason() {
+      const draft = normalizeReason(reasonInput.value);
+      if (!draft) return;
+      addReason(draft);
+    }
+
+    function appendReasonOption(option) {
+      addReason(option);
+      reasonSuggestions.classList.remove('active');
+      reasonInput.focus();
+    }
+
+    function getReasonOptions(term = '') {
+      const query = normalizeReason(term).toLowerCase();
+      const selected = new Set(selectedReasons.map((item) => item.toLowerCase()));
+
+      return defaultReasonOptions.filter((option) => {
+        const optionLower = option.toLowerCase();
+        if (selected.has(optionLower)) return false;
+        if (!query) return true;
+        return optionLower.includes(query);
+      });
+    }
+
+    function renderReasonSuggestions() {
+      const options = getReasonOptions(reasonInput.value);
+      reasonSuggestions.innerHTML = '';
+
+      if (!options.length) {
+        reasonSuggestions.innerHTML = '<div class="reason-empty">Nenhuma opção encontrada</div>';
+        reasonSuggestions.classList.add('active');
+        return;
+      }
+
+      options.forEach((option) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'reason-option';
+        button.textContent = option;
+        button.addEventListener('click', () => {
+          appendReasonOption(option);
+        });
+        reasonSuggestions.appendChild(button);
+      });
+
+      reasonSuggestions.classList.add('active');
+    }
+
+    reasonInput.addEventListener('focus', renderReasonSuggestions);
+    reasonInput.addEventListener('input', () => {
+      const value = reasonInput.value;
+      if (value.includes(',')) {
+        const parts = value.split(',');
+        const draft = parts.pop();
+        parts.forEach((part) => addReason(part));
+        reasonInput.value = normalizeReason(draft);
+      }
+      renderReasonSuggestions();
+    });
+    reasonInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ',') {
+        event.preventDefault();
+        finishDraftReason();
+      }
+    });
+    reasonInput.addEventListener('blur', () => {
+      setTimeout(() => {
+        if (reasonInput.value.trim()) finishDraftReason();
+        reasonSuggestions.classList.remove('active');
+      }, 150);
+    });
+    document.addEventListener('click', (event) => {
+      if (!event.target.closest('.reason-field')) {
+        reasonSuggestions.classList.remove('active');
+      }
+    });
+
+    syncReasonTags();
 
     function formatMoney(value) {
       return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
@@ -287,21 +566,69 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(operations));
     }
 
-    function render() {
-      const operations = loadOperations();
-      operations.sort((a, b) => new Date(b.date) - new Date(a.date));
+    function ensureOperationIds(operations) {
+      let changed = false;
 
-      totalTrades.textContent = operations.length;
-      const sum = operations.reduce((acc, op) => acc + Number(op.result || 0), 0);
+      operations.forEach((op, index) => {
+        if (!op.id) {
+          op.id = `op-${Date.now()}-${index}-${Math.random().toString(16).slice(2)}`;
+          changed = true;
+        }
+      });
+
+      if (changed) {
+        saveOperations(operations);
+      }
+
+      return operations;
+    }
+
+    function populateMonthFilter(operations) {
+      const months = [...new Set(operations.map((op) => op.date.slice(0, 7)))].sort((a, b) => b.localeCompare(a));
+
+      const currentValue = monthFilter.value;
+      monthFilter.innerHTML = '<option value="all">Todos os meses</option>';
+
+      months.forEach((monthKey) => {
+        const option = document.createElement('option');
+        option.value = monthKey;
+        option.textContent = new Date(`${monthKey}-01T00:00:00`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+        monthFilter.appendChild(option);
+      });
+
+      if (months.includes(currentValue)) {
+        monthFilter.value = currentValue;
+      } else {
+        monthFilter.value = 'all';
+      }
+    }
+
+    function getFilteredOperations(operations) {
+      const selectedMonth = monthFilter.value;
+      if (!selectedMonth || selectedMonth === 'all') return operations;
+      return operations.filter((op) => op.date.slice(0, 7) === selectedMonth);
+    }
+
+    function render() {
+      const operations = ensureOperationIds(loadOperations());
+      populateMonthFilter(operations);
+
+      const filteredOperations = getFilteredOperations(operations);
+      const sortedOperations = [...filteredOperations].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      totalTrades.textContent = filteredOperations.length;
+      const sum = filteredOperations.reduce((acc, op) => acc + Number(op.result || 0), 0);
       totalResult.textContent = formatMoney(sum);
-      currentMonth.textContent = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      currentMonth.textContent = monthFilter.value === 'all'
+        ? new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+        : new Date(`${monthFilter.value}-01T00:00:00`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
       todayLabel.textContent = `Hoje: ${new Date().toLocaleDateString('pt-BR')}`;
 
       operationsTable.innerHTML = '';
-      if (!operations.length) {
-        operationsTable.innerHTML = '<tr><td colspan="5" class="muted">Nenhuma operação cadastrada ainda.</td></tr>';
+      if (!sortedOperations.length) {
+        operationsTable.innerHTML = '<tr><td colspan="6" class="muted">Nenhuma operação cadastrada para o período selecionado.</td></tr>';
       } else {
-        operations.forEach(op => {
+        sortedOperations.forEach((op) => {
           const tr = document.createElement('tr');
           tr.innerHTML = `
             <td>${formatDate(op.date)}</td>
@@ -309,13 +636,26 @@
             <td>${op.operationType || '-'}</td>
             <td>${op.reason}</td>
             <td class="${op.result >= 0 ? 'positive' : 'negative'}">${formatMoney(op.result)}</td>
+            <td>
+              <button type="button" class="delete-btn" data-id="${op.id}" title="Excluir operação" aria-label="Excluir operação">🗑</button>
+            </td>
           `;
           operationsTable.appendChild(tr);
         });
       }
 
+      document.querySelectorAll('.delete-btn').forEach((button) => {
+        button.addEventListener('click', () => {
+          const operationId = button.dataset.id;
+          const operations = loadOperations();
+          const updatedOperations = operations.filter((op) => op.id !== operationId);
+          saveOperations(updatedOperations);
+          render();
+        });
+      });
+
       const monthlyMap = {};
-      operations.forEach(op => {
+      filteredOperations.forEach(op => {
         const key = op.date.slice(0, 7);
         if (!monthlyMap[key]) monthlyMap[key] = 0;
         monthlyMap[key] += Number(op.result || 0);
@@ -342,6 +682,96 @@
       drawPieChart(operations);
     }
 
+    function formatPercent(value) {
+      return `${(Number(value) || 0).toFixed(2).replace('.', ',')}%`;
+    }
+
+    function getDrawdownState(value) {
+      if (value >= 20) return { text: 'Crítico', className: 'critical' };
+      if (value >= 10) return { text: 'Alerta', className: 'warning' };
+      return { text: 'Saudável', className: 'safe' };
+    }
+
+    function calculateDrawdown(operations) {
+      const orderedOps = [...operations].sort((a, b) => new Date(a.date) - new Date(b.date));
+      let cumulative = 0;
+      let peak = 0;
+      let maxDrawdown = 0;
+      const series = [];
+
+      orderedOps.forEach((op) => {
+        cumulative += Number(op.result || 0);
+        if (cumulative > peak) peak = cumulative;
+
+        const drawdownPercent = peak > 0 ? ((peak - cumulative) / peak) * 100 : 0;
+        if (peak > 0) {
+          maxDrawdown = Math.max(maxDrawdown, drawdownPercent);
+        }
+
+        series.push({
+          date: op.date,
+          value: Math.max(0, drawdownPercent)
+        });
+      });
+
+      const currentDrawdown = peak > 0 ? ((peak - cumulative) / peak) * 100 : 0;
+      return { maxDrawdown, currentDrawdown, series };
+    }
+
+    function drawDrawdownChart(series) {
+      const canvas = document.getElementById('drawdownChart');
+      if (!canvas) return;
+
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const width = canvas.clientWidth || 220;
+      const height = 88;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+
+      if (!series.length) {
+        ctx.fillStyle = '#9eb0c8';
+        ctx.font = '12px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText('Sem dados', width / 2, height / 2 + 4);
+        return;
+      }
+
+      const padding = 8;
+      const chartWidth = width - padding * 2;
+      const chartHeight = height - padding * 2;
+      const maxValue = Math.max(1, ...series.map(item => item.value));
+
+      const points = series.map((item, index) => {
+        const x = padding + (index / Math.max(1, series.length - 1)) * chartWidth;
+        const y = height - padding - (item.value / maxValue) * chartHeight;
+        return { x, y, value: item.value };
+      });
+
+      const gradient = ctx.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+      gradient.addColorStop(1, 'rgba(56, 189, 248, 0)');
+
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, height - padding);
+      points.forEach((point) => ctx.lineTo(point.x, point.y));
+      ctx.lineTo(points[points.length - 1].x, height - padding);
+      ctx.closePath();
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      ctx.beginPath();
+      points.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
     function renderInsights(operations) {
       const assetMap = {};
       const reasonMap = {};
@@ -354,6 +784,8 @@
 
       const sortedAssets = Object.entries(assetMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
       const sortedReasons = Object.entries(reasonMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      const drawdown = calculateDrawdown(operations);
+      const state = getDrawdownState(drawdown.currentDrawdown);
 
       topAssets.innerHTML = '';
       topReasons.innerHTML = '';
@@ -379,6 +811,14 @@
           topReasons.appendChild(item);
         });
       }
+
+      maxDrawdownEl.textContent = formatPercent(drawdown.maxDrawdown);
+      currentDrawdownEl.textContent = formatPercent(drawdown.currentDrawdown);
+      drawdownTotal.textContent = formatPercent(drawdown.currentDrawdown);
+      drawdownStatus.textContent = state.text;
+      drawdownStatus.className = `drawdown-badge ${state.className}`;
+      drawdownTotal.className = `drawdown-figure ${state.className}`;
+      drawDrawdownChart(drawdown.series);
     }
 
     function drawMonthlyChart(items) {
@@ -472,23 +912,39 @@
 
     form.addEventListener('submit', (event) => {
       event.preventDefault();
+
+      if (reasonInput.value.trim()) {
+        finishDraftReason();
+      }
+
       const operation = {
+        id: `op-${Date.now()}-${Math.random().toString(16).slice(2)}`,
         date: document.getElementById('date').value,
         ticker: document.getElementById('ticker').value.toUpperCase(),
         operationType: document.getElementById('operationType').value,
-        reason: document.getElementById('reason').value,
+        reason: selectedReasons.join(', '),
         result: Number(document.getElementById('result').value)
       };
 
       const operations = loadOperations();
       operations.push(operation);
       saveOperations(operations);
+
+      selectedReasons.length = 0;
+      reasonInput.value = '';
+      syncReasonTags();
+      reasonSuggestions.classList.remove('active');
       form.reset();
       render();
     });
 
     clearDataBtn.addEventListener('click', () => {
       localStorage.removeItem(STORAGE_KEY);
+      monthFilter.value = 'all';
+      render();
+    });
+
+    monthFilter.addEventListener('change', () => {
       render();
     });
 
