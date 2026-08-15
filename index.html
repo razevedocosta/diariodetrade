@@ -216,7 +216,8 @@
     .positive { color: var(--green); font-weight: 700; }
     .negative { color: var(--red); font-weight: 700; }
 
-    .chart-area { display: grid; gap: 16px; margin-top: 16px; }
+    .chart-area { display: grid; gap: 16px; margin-top: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .chart-item--full { grid-column: 1 / -1; }
     canvas { width: 100%; height: 220px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid var(--border); }
 
     .muted { color: var(--muted); }
@@ -226,6 +227,7 @@
       .stats { grid-template-columns: 1fr; }
       .row { grid-template-columns: 1fr; }
       .insights-grid { grid-template-columns: 1fr; }
+      .chart-area { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -316,10 +318,16 @@
     <section class="card" style="margin-top:20px;">
       <h2 style="margin-top:0">Gráficos</h2>
       <div class="chart-area">
+        <div class="chart-item--full">
+          <div class="muted" style="margin-bottom:8px;">Resultado por semana</div>
+          <canvas id="weeklyChart"></canvas>
+        </div>
+
         <div>
           <div class="muted" style="margin-bottom:8px;">Resultado por mês</div>
           <canvas id="monthlyChart"></canvas>
         </div>
+        
         <div>
           <div class="muted" style="margin-bottom:8px;">Lucro x Prejuízo</div>
           <canvas id="pieChart"></canvas>
@@ -355,7 +363,7 @@
 
     <section class="card" style="margin-top:20px;">
       <div class="section-header">
-        <h2 style="margin-top:0">Operações cadastradas</h2>
+        <h2 style="margin-top:0">Operações</h2>
         <select id="monthFilter" class="filter-select" aria-label="Filtrar por mês">
           <option value="all">Todos os meses</option>
         </select>
@@ -680,7 +688,117 @@
 
       renderInsights(operations);
       drawMonthlyChart(items);
-      drawPieChart(operations);
+      drawWeeklyChart(filteredOperations);
+      drawPieChart(filteredOperations);
+    }
+
+    function buildWeeklyData(operations) {
+      const weeklyMap = {};
+
+      operations.forEach((op) => {
+        const date = new Date(op.date + 'T00:00:00');
+        const diff = (date.getDay() + 6) % 7;
+        const monday = new Date(date);
+        monday.setDate(date.getDate() - diff);
+        monday.setHours(0, 0, 0, 0);
+
+        const key = monday.toISOString().slice(0, 10);
+        if (!weeklyMap[key]) {
+          weeklyMap[key] = {
+            label: monday.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+            total: 0
+          };
+        }
+
+        weeklyMap[key].total += Number(op.result || 0);
+      });
+
+      return Object.entries(weeklyMap)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([, value]) => value);
+    }
+
+    function drawWeeklyChart(operations) {
+      const canvas = document.getElementById('weeklyChart');
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const width = canvas.clientWidth || 560;
+      const height = 220;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+
+      const data = buildWeeklyData(operations);
+      if (!data.length) {
+        ctx.fillStyle = '#9eb0c8';
+        ctx.font = '12px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText('Sem dados semanais', width / 2, height / 2 + 4);
+        return;
+      }
+
+      const values = data.map((item) => item.total);
+      const maxAbs = Math.max(1, ...values.map((value) => Math.abs(value)));
+      const padding = 28;
+      const chartWidth = width - padding * 2;
+      const chartHeight = height - padding * 2;
+      const zeroY = height - padding - (chartHeight / 2);
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+      ctx.beginPath();
+      ctx.moveTo(padding, zeroY);
+      ctx.lineTo(width - padding, zeroY);
+      ctx.stroke();
+
+      const points = data.map((item, index) => {
+        const x = padding + (chartWidth / Math.max(1, data.length - 1)) * index;
+        const y = height - padding - (((item.total + maxAbs) / (maxAbs * 2)) * chartHeight);
+        return { ...item, x, y };
+      });
+
+      const gradient = ctx.createLinearGradient(0, padding, 0, height - padding);
+      gradient.addColorStop(0, 'rgba(56,189,248,0.36)');
+      gradient.addColorStop(1, 'rgba(56,189,248,0.02)');
+
+      ctx.beginPath();
+      points.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = '#38bdf8';
+      ctx.stroke();
+
+      ctx.beginPath();
+      points.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
+      ctx.lineTo(points[points.length - 1].x, height - padding);
+      ctx.lineTo(points[0].x, height - padding);
+      ctx.closePath();
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      points.forEach((point) => {
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = point.total >= 0 ? '#22c55e' : '#ef4444';
+        ctx.fill();
+
+        ctx.fillStyle = '#f5f7fb';
+        ctx.font = '10px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText(formatMoney(point.total), point.x, point.y - 12);
+      });
+
+      ctx.fillStyle = '#9eb0c8';
+      ctx.font = '10px Inter';
+      ctx.textAlign = 'center';
+      points.forEach((point) => {
+        ctx.fillText(point.label, point.x, height - 8);
+      });
     }
 
     function formatPercent(value) {
