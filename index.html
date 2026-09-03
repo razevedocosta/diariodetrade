@@ -346,6 +346,27 @@
           <h3>Mais frequentes</h3>
           <div class="insight-list" id="topReasons"></div>
         </div>
+        <div class="insight-block">
+          <div class="drawdown-header">
+            <h3 style="margin:0;">Taxa de acerto</h3>
+            <span id="winRate" class="drawdown-figure safe" style="font-size:1.1rem;">0,00%</span>
+          </div>
+          <div class="muted" id="winLossSummary" style="margin-top:10px;">0 acertos vs 0 perdas</div>
+        </div>
+        <div class="insight-block">
+          <div class="drawdown-header">
+            <h3 style="margin:0;">Fator de lucro</h3>
+            <span id="profitFactor" class="drawdown-figure safe" style="font-size:1.1rem;">0,00</span>
+          </div>
+          <div class="muted" id="profitFactorSummary" style="margin-top:10px;">Lucro: R$ 0,00 / R$ 0,00</div>
+        </div>
+        <div class="insight-block">
+          <div class="drawdown-header">
+            <h3 style="margin:0;">Risco : Ganho médio</h3>
+            <span id="riskRewardRatio" class="drawdown-figure safe" style="font-size:1.1rem;">0,00</span>
+          </div>
+          <div class="muted" id="riskRewardSummary" style="margin-top:10px;">Ganho médio: R$ 0,00 / Perda média: R$ 0,00</div>
+        </div>
         <div class="insight-block insight-block--drawdown">
           <div class="drawdown-header">
             <h3 style="margin:0;">Drawdown</h3>
@@ -401,6 +422,12 @@
     const currentDrawdownEl = document.getElementById('currentDrawdown');
     const drawdownStatus = document.getElementById('drawdownStatus');
     const drawdownTotal = document.getElementById('drawdownTotal');
+    const winRateEl = document.getElementById('winRate');
+    const winLossSummaryEl = document.getElementById('winLossSummary');
+    const profitFactorEl = document.getElementById('profitFactor');
+    const profitFactorSummaryEl = document.getElementById('profitFactorSummary');
+    const riskRewardRatioEl = document.getElementById('riskRewardRatio');
+    const riskRewardSummaryEl = document.getElementById('riskRewardSummary');
     const monthFilter = document.getElementById('monthFilter');
 
     const STORAGE_KEY = 'daytrade-operations';
@@ -905,6 +932,16 @@
       const sortedReasons = Object.entries(reasonMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
       const drawdown = calculateDrawdown(operations);
       const state = getDrawdownState(drawdown.currentDrawdown);
+      const wins = operations.filter(op => Number(op.result) >= 0).length;
+      const losses = operations.filter(op => Number(op.result) < 0).length;
+      const totalOps = wins + losses;
+      const winRate = totalOps > 0 ? (wins / totalOps) * 100 : 0;
+      const grossProfit = operations.reduce((acc, op) => acc + (Number(op.result) > 0 ? Number(op.result) : 0), 0);
+      const grossLoss = operations.reduce((acc, op) => acc + (Number(op.result) < 0 ? Number(op.result) : 0), 0);
+      const profitFactor = grossLoss < 0 ? grossProfit / Math.abs(grossLoss) : (grossProfit > 0 ? Infinity : 0);
+      const avgWin = wins > 0 ? grossProfit / wins : 0;
+      const avgLoss = losses > 0 ? Math.abs(grossLoss) / losses : 0;
+      const riskRewardRatio = avgLoss > 0 ? avgWin / avgLoss : (avgWin > 0 ? Infinity : 0);
 
       topAssets.innerHTML = '';
       topReasons.innerHTML = '';
@@ -930,6 +967,21 @@
           topReasons.appendChild(item);
         });
       }
+
+      const winRateClass = winRate >= 50 ? 'safe' : winRate >= 40 ? 'warning' : 'critical';
+      winRateEl.textContent = formatPercent(winRate);
+      winRateEl.className = `drawdown-figure ${winRateClass}`;
+      winLossSummaryEl.textContent = `${wins} acertos vs ${losses} perdas`;
+
+      const profitFactorClass = profitFactor >= 1.5 ? 'safe' : profitFactor >= 1 ? 'warning' : 'critical';
+      profitFactorEl.textContent = Number.isFinite(profitFactor) ? profitFactor.toFixed(2).replace('.', ',') : '∞';
+      profitFactorEl.className = `drawdown-figure ${profitFactorClass}`;
+      profitFactorSummaryEl.textContent = `Lucro: ${formatMoney(grossProfit)} / ${formatMoney(Math.abs(grossLoss))}`;
+
+      const riskRewardClass = riskRewardRatio >= 1.5 ? 'safe' : riskRewardRatio >= 1 ? 'warning' : 'critical';
+      riskRewardRatioEl.textContent = Number.isFinite(riskRewardRatio) ? riskRewardRatio.toFixed(2).replace('.', ',') : '∞';
+      riskRewardRatioEl.className = `drawdown-figure ${riskRewardClass}`;
+      riskRewardSummaryEl.textContent = `Média de ganho: ${formatMoney(avgWin)} / Média de perda: ${formatMoney(avgLoss)}`;
 
       maxDrawdownEl.textContent = formatPercent(drawdown.maxDrawdown);
       currentDrawdownEl.textContent = formatPercent(drawdown.currentDrawdown);
