@@ -18,6 +18,7 @@
     }
 
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
     body {
       margin: 0;
       font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
@@ -141,7 +142,7 @@
     }
 
     .section-header {
-      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
       margin-bottom: 12px;
     }
     .section-header h2 {
@@ -157,6 +158,52 @@
       color: var(--text);
       font-size: 0.95rem;
     }
+
+    .section-header-actions {
+      display: grid; gap: 8px; justify-items: stretch;
+    }
+    .view-toggle {
+      display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px;
+      background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px;
+    }
+    .view-toggle-btn {
+      width: auto; padding: 7px 14px; border: none; border-radius: 9px;
+      background: transparent; color: var(--muted); font-size: 0.9rem; font-weight: 600;
+    }
+    .view-toggle-btn:hover { transform: none; color: var(--text); }
+    .view-toggle-btn.active {
+      background: rgba(56,189,248,0.16); color: var(--text);
+      box-shadow: inset 0 0 0 1px rgba(56,189,248,0.35);
+    }
+
+    .calendar-wrap { display: grid; gap: 22px; margin-top: 12px; }
+    .calendar-month-header {
+      display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+      margin-bottom: 10px;
+    }
+    .calendar-month-title { font-weight: 700; text-transform: capitalize; }
+    .calendar-weekdays, .calendar-grid {
+      display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px;
+    }
+    .calendar-weekdays {
+      margin-bottom: 8px; color: var(--muted); font-size: 0.75rem;
+      text-transform: uppercase; letter-spacing: 0.06em; text-align: center;
+    }
+    .calendar-day {
+      display: grid; align-content: start; gap: 4px;
+      min-height: 84px; padding: 8px;
+      border: 1px solid var(--border); border-radius: 12px;
+      background: rgba(255,255,255,0.03);
+    }
+    .calendar-day.blank { background: transparent; border-color: transparent; }
+    .calendar-day.today { border-color: rgba(56,189,248,0.55); }
+    .calendar-day.win { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.32); }
+    .calendar-day.loss { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.32); }
+    .calendar-day-number { color: var(--muted); font-size: 0.8rem; font-weight: 700; }
+    .calendar-day.win .calendar-day-number,
+    .calendar-day.loss .calendar-day-number { color: var(--text); }
+    .calendar-day-result { font-size: 0.88rem; font-weight: 700; word-break: break-word; }
+    .calendar-day-count { color: var(--muted); font-size: 0.72rem; }
 
     .insights-grid {
       display: grid; gap: 16px; grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -228,6 +275,10 @@
       .row { grid-template-columns: 1fr; }
       .insights-grid { grid-template-columns: 1fr; }
       .chart-area { grid-template-columns: 1fr; }
+      .calendar-weekdays, .calendar-grid { gap: 4px; }
+      .calendar-day { min-height: 68px; padding: 5px; }
+      .calendar-day-result { font-size: 0.72rem; }
+      .calendar-day-count { display: none; }
     }
   </style>
 </head>
@@ -385,11 +436,17 @@
     <section class="card" style="margin-top:20px;">
       <div class="section-header">
         <h2 style="margin-top:0">Operações</h2>
-        <select id="monthFilter" class="filter-select" aria-label="Filtrar por mês">
-          <option value="all">Todos os meses</option>
-        </select>
+        <div class="section-header-actions">
+          <select id="monthFilter" class="filter-select" aria-label="Filtrar por mês">
+            <option value="all">Todos os meses</option>
+          </select>
+          <div class="view-toggle" role="group" aria-label="Modo de visualização">
+            <button type="button" class="view-toggle-btn active" data-view="list" aria-pressed="true">Lista</button>
+            <button type="button" class="view-toggle-btn" data-view="grid" aria-pressed="false">Grade</button>
+          </div>
+        </div>
       </div>
-      <div class="table-wrap">
+      <div class="table-wrap" id="listView">
         <table>
           <thead>
             <tr>
@@ -404,6 +461,7 @@
           <tbody id="operationsTable"></tbody>
         </table>
       </div>
+      <div class="calendar-wrap" id="gridView" hidden></div>
     </section>
   </div>
 
@@ -429,8 +487,16 @@
     const riskRewardRatioEl = document.getElementById('riskRewardRatio');
     const riskRewardSummaryEl = document.getElementById('riskRewardSummary');
     const monthFilter = document.getElementById('monthFilter');
+    const listView = document.getElementById('listView');
+    const gridView = document.getElementById('gridView');
+    const viewToggleButtons = document.querySelectorAll('.view-toggle-btn');
 
     const STORAGE_KEY = 'daytrade-operations';
+    const VIEW_STORAGE_KEY = 'daytrade-operations-view';
+    const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    let currentView = localStorage.getItem(VIEW_STORAGE_KEY) === 'grid' ? 'grid' : 'list';
+    let monthFilterInitialized = false;
+    let pendingMonthFilter = null;
     const defaultReasonOptions = [
       'Falha de topo',
       'Falha de fundo',
@@ -619,10 +685,17 @@
       return operations;
     }
 
-    function populateMonthFilter(operations) {
-      const months = [...new Set(operations.map((op) => op.date.slice(0, 7)))].sort((a, b) => b.localeCompare(a));
+    function getCurrentMonthKey() {
+      return toDateKey(new Date()).slice(0, 7);
+    }
 
-      const currentValue = monthFilter.value;
+    function populateMonthFilter(operations) {
+      const currentMonthKey = getCurrentMonthKey();
+      const months = [...new Set([currentMonthKey, ...operations.map((op) => op.date.slice(0, 7))])]
+        .sort((a, b) => b.localeCompare(a));
+
+      const desiredValue = pendingMonthFilter || (monthFilterInitialized ? monthFilter.value : currentMonthKey);
+      pendingMonthFilter = null;
       monthFilter.innerHTML = '<option value="all">Todos os meses</option>';
 
       months.forEach((monthKey) => {
@@ -632,17 +705,157 @@
         monthFilter.appendChild(option);
       });
 
-      if (months.includes(currentValue)) {
-        monthFilter.value = currentValue;
-      } else {
-        monthFilter.value = 'all';
-      }
+      const isValid = desiredValue === 'all' || months.includes(desiredValue);
+      monthFilter.value = isValid ? desiredValue : currentMonthKey;
+      monthFilterInitialized = true;
     }
 
     function getFilteredOperations(operations) {
       const selectedMonth = monthFilter.value;
       if (!selectedMonth || selectedMonth === 'all') return operations;
       return operations.filter((op) => op.date.slice(0, 7) === selectedMonth);
+    }
+
+    function toDateKey(date) {
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${date.getFullYear()}-${month}-${day}`;
+    }
+
+    function buildDailyMap(operations) {
+      const map = new Map();
+
+      operations.forEach((op) => {
+        const entry = map.get(op.date) || { total: 0, count: 0, ops: [] };
+        entry.total += Number(op.result || 0);
+        entry.count += 1;
+        entry.ops.push(op);
+        map.set(op.date, entry);
+      });
+
+      return map;
+    }
+
+    function getCalendarMonths(operations) {
+      const selectedMonth = monthFilter.value;
+      if (selectedMonth && selectedMonth !== 'all') return [selectedMonth];
+
+      const months = [...new Set(operations.map((op) => op.date.slice(0, 7)))].sort((a, b) => b.localeCompare(a));
+      return months.length ? months : [toDateKey(new Date()).slice(0, 7)];
+    }
+
+    function buildCalendarMonth(monthKey, dailyMap) {
+      const [year, month] = monthKey.split('-').map(Number);
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const leadingBlanks = new Date(year, month - 1, 1).getDay();
+      const todayKey = toDateKey(new Date());
+
+      const section = document.createElement('div');
+
+      const grid = document.createElement('div');
+      grid.className = 'calendar-grid';
+
+      let monthTotal = 0;
+      let tradedDays = 0;
+
+      for (let index = 0; index < leadingBlanks; index += 1) {
+        const blank = document.createElement('div');
+        blank.className = 'calendar-day blank';
+        grid.appendChild(blank);
+      }
+
+      for (let day = 1; day <= daysInMonth; day += 1) {
+        const dayKey = `${monthKey}-${String(day).padStart(2, '0')}`;
+        const entry = dailyMap.get(dayKey);
+        const cell = document.createElement('div');
+        cell.className = 'calendar-day';
+
+        if (dayKey === todayKey) cell.classList.add('today');
+
+        const number = document.createElement('div');
+        number.className = 'calendar-day-number';
+        number.textContent = day;
+        cell.appendChild(number);
+
+        if (entry) {
+          monthTotal += entry.total;
+          tradedDays += 1;
+          cell.classList.add(entry.total >= 0 ? 'win' : 'loss');
+          cell.title = entry.ops
+            .map((op) => `${op.ticker} (${op.operationType || '-'}): ${formatMoney(op.result)}`)
+            .join('\n');
+
+          const result = document.createElement('div');
+          result.className = `calendar-day-result ${entry.total >= 0 ? 'positive' : 'negative'}`;
+          result.textContent = formatMoney(entry.total);
+          cell.appendChild(result);
+
+          const count = document.createElement('div');
+          count.className = 'calendar-day-count';
+          count.textContent = `${entry.count} ${entry.count === 1 ? 'operação' : 'operações'}`;
+          cell.appendChild(count);
+        }
+
+        grid.appendChild(cell);
+      }
+
+      const trailingBlanks = (7 - ((leadingBlanks + daysInMonth) % 7)) % 7;
+      for (let index = 0; index < trailingBlanks; index += 1) {
+        const blank = document.createElement('div');
+        blank.className = 'calendar-day blank';
+        grid.appendChild(blank);
+      }
+
+      const header = document.createElement('div');
+      header.className = 'calendar-month-header';
+      header.innerHTML = `
+        <span class="calendar-month-title">${new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</span>
+        <span class="muted" style="font-size:0.85rem;">
+          ${tradedDays} ${tradedDays === 1 ? 'dia operado' : 'dias operados'} ·
+          <strong class="${monthTotal >= 0 ? 'positive' : 'negative'}">${formatMoney(monthTotal)}</strong>
+        </span>
+      `;
+
+      const weekdays = document.createElement('div');
+      weekdays.className = 'calendar-weekdays';
+      WEEKDAY_LABELS.forEach((label) => {
+        const cell = document.createElement('div');
+        cell.textContent = label;
+        weekdays.appendChild(cell);
+      });
+
+      section.appendChild(header);
+      section.appendChild(weekdays);
+      section.appendChild(grid);
+      return section;
+    }
+
+    function renderCalendar(operations) {
+      const dailyMap = buildDailyMap(operations);
+      gridView.innerHTML = '';
+
+      if (!operations.length) {
+        const empty = document.createElement('div');
+        empty.className = 'muted';
+        empty.textContent = 'Nenhuma operação cadastrada para o período selecionado.';
+        gridView.appendChild(empty);
+        return;
+      }
+
+      getCalendarMonths(operations).forEach((monthKey) => {
+        gridView.appendChild(buildCalendarMonth(monthKey, dailyMap));
+      });
+    }
+
+    function applyView() {
+      listView.hidden = currentView !== 'list';
+      gridView.hidden = currentView !== 'grid';
+
+      viewToggleButtons.forEach((button) => {
+        const isActive = button.dataset.view === currentView;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-pressed', String(isActive));
+      });
     }
 
     function render() {
@@ -679,6 +892,9 @@
           operationsTable.appendChild(tr);
         });
       }
+
+      renderCalendar(sortedOperations);
+      applyView();
 
       document.querySelectorAll('.delete-btn').forEach((button) => {
         button.addEventListener('click', () => {
@@ -1100,6 +1316,7 @@
       const operations = loadOperations();
       operations.push(operation);
       saveOperations(operations);
+      pendingMonthFilter = operation.date.slice(0, 7);
 
       selectedReasons.length = 0;
       reasonInput.value = '';
@@ -1111,12 +1328,20 @@
 
     clearDataBtn.addEventListener('click', () => {
       localStorage.removeItem(STORAGE_KEY);
-      monthFilter.value = 'all';
+      pendingMonthFilter = getCurrentMonthKey();
       render();
     });
 
     monthFilter.addEventListener('change', () => {
       render();
+    });
+
+    viewToggleButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        currentView = button.dataset.view === 'grid' ? 'grid' : 'list';
+        localStorage.setItem(VIEW_STORAGE_KEY, currentView);
+        applyView();
+      });
     });
 
     render();
