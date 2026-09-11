@@ -48,7 +48,7 @@ Abra o arquivo `index.html` no navegador. Não há dependências, build ou insta
 
 ## Escopo do filtro de mês
 
-O filtro de mês afeta os indicadores gerais, o resumo mensal, os gráficos e a listagem de operações. Os cards de insights (ativos, motivos, taxa de acerto, fator de lucro, risco : ganho e drawdown) consideram sempre o histórico completo.
+O filtro de mês afeta os indicadores gerais, o resumo mensal, os gráficos, a listagem de operações e os cards de insights (ativos, motivos, taxa de acerto, fator de lucro, risco : ganho e drawdown).
 
 ## Estrutura
 

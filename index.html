@@ -361,7 +361,12 @@
       </section>
 
       <section class="card">
-        <h2 style="margin-top:0">Resumo mensal</h2>
+        <div class="section-header">
+          <h2 style="margin-top:0">Resumo</h2>
+          <select id="monthFilter" class="filter-select" aria-label="Filtrar por mês">
+            <option value="all">Todos os meses</option>
+          </select>
+        </div>
         <div class="summary-list" id="monthlySummary"></div>
       </section>
     </div>
@@ -437,9 +442,6 @@
       <div class="section-header">
         <h2 style="margin-top:0">Operações</h2>
         <div class="section-header-actions">
-          <select id="monthFilter" class="filter-select" aria-label="Filtrar por mês">
-            <option value="all">Todos os meses</option>
-          </select>
           <div class="view-toggle" role="group" aria-label="Modo de visualização">
             <button type="button" class="view-toggle-btn active" data-view="list" aria-pressed="true">Lista</button>
             <button type="button" class="view-toggle-btn" data-view="grid" aria-pressed="false">Grade</button>
@@ -929,7 +931,7 @@
         });
       }
 
-      renderInsights(operations);
+      renderInsights(filteredOperations);
       drawMonthlyChart(items);
       drawWeeklyChart(filteredOperations);
       drawPieChart(filteredOperations);
