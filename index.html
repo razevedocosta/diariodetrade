@@ -879,6 +879,7 @@
       const dpr = window.devicePixelRatio || 1;
       const width = canvas.clientWidth || 780;
       const height = 300;
+      const isDesktop = window.innerWidth > 900;
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -924,13 +925,15 @@
         ctx.fillStyle = color;
         ctx.fillRect(x, y, barWidth, Math.max(4, barHeight));
 
-        ctx.fillStyle = '#e5edf9';
-        ctx.font = '10px Inter';
-        ctx.textAlign = 'center';
-        ctx.fillText(formatMoney(value), x + barWidth / 2, value >= 0 ? y - 6 : y + barHeight + 14);
+        if (isDesktop) {
+          ctx.fillStyle = '#e5edf9';
+          ctx.font = '10px Inter';
+          ctx.textAlign = 'center';
+          ctx.fillText(formatMoney(value), x + barWidth / 2, value >= 0 ? y - 6 : y + barHeight + 14);
 
-        ctx.fillStyle = '#9eb0c8';
-        ctx.fillText(String(index + 1), x + barWidth / 2, height - 12);
+          ctx.fillStyle = '#9eb0c8';
+          ctx.fillText(String(index + 1), x + barWidth / 2, height - 12);
+        }
       });
     }
 
