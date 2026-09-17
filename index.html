@@ -176,6 +176,13 @@
       box-shadow: inset 0 0 0 1px rgba(56,189,248,0.35);
     }
 
+    .trade-chart-wrap {
+      display: grid; gap: 14px; margin-top: 12px;
+    }
+    .trade-chart-wrap canvas {
+      min-height: 300px;
+    }
+
     .calendar-wrap { display: grid; gap: 22px; margin-top: 12px; }
     .calendar-month-header {
       display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
@@ -445,6 +452,7 @@
           <div class="view-toggle" role="group" aria-label="Modo de visualização">
             <button type="button" class="view-toggle-btn active" data-view="list" aria-pressed="true">Lista</button>
             <button type="button" class="view-toggle-btn" data-view="grid" aria-pressed="false">Grade</button>
+            <button type="button" class="view-toggle-btn" data-view="bar" aria-pressed="false">Trades</button>
           </div>
         </div>
       </div>
@@ -464,6 +472,9 @@
         </table>
       </div>
       <div class="calendar-wrap" id="gridView" hidden></div>
+      <div class="trade-chart-wrap" id="barView" hidden>
+        <canvas id="tradeBarsChart"></canvas>
+      </div>
     </section>
   </div>
 
@@ -491,12 +502,13 @@
     const monthFilter = document.getElementById('monthFilter');
     const listView = document.getElementById('listView');
     const gridView = document.getElementById('gridView');
+    const barView = document.getElementById('barView');
     const viewToggleButtons = document.querySelectorAll('.view-toggle-btn');
 
     const STORAGE_KEY = 'daytrade-operations';
     const VIEW_STORAGE_KEY = 'daytrade-operations-view';
     const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-    let currentView = localStorage.getItem(VIEW_STORAGE_KEY) === 'grid' ? 'grid' : 'list';
+    let currentView = ['list', 'grid', 'bar'].includes(localStorage.getItem(VIEW_STORAGE_KEY)) ? localStorage.getItem(VIEW_STORAGE_KEY) : 'list';
     let monthFilterInitialized = false;
     let pendingMonthFilter = null;
     const defaultReasonOptions = [
@@ -852,11 +864,73 @@
     function applyView() {
       listView.hidden = currentView !== 'list';
       gridView.hidden = currentView !== 'grid';
+      barView.hidden = currentView !== 'bar';
 
       viewToggleButtons.forEach((button) => {
         const isActive = button.dataset.view === currentView;
         button.classList.toggle('active', isActive);
         button.setAttribute('aria-pressed', String(isActive));
+      });
+    }
+
+    function drawTradeBarChart(operations) {
+      const canvas = document.getElementById('tradeBarsChart');
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const width = canvas.clientWidth || 780;
+      const height = 300;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+
+      if (!operations.length) {
+        ctx.fillStyle = '#9eb0c8';
+        ctx.font = '12px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText('Sem dados para o gráfico de trades', width / 2, height / 2 + 4);
+        return;
+      }
+
+      const sortedOperations = [...operations].sort((a, b) => new Date(a.date) - new Date(b.date));
+      const padding = 36;
+      const chartWidth = width - padding * 2;
+      const chartHeight = height - padding * 2;
+      const values = sortedOperations.map((op) => Number(op.result || 0));
+      const maxAbs = Math.max(1, ...values.map((value) => Math.abs(value)));
+      const zeroY = padding + chartHeight / 2;
+
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.beginPath();
+      ctx.moveTo(padding, padding);
+      ctx.lineTo(padding, height - padding);
+      ctx.lineTo(width - padding, height - padding);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(padding, zeroY);
+      ctx.lineTo(width - padding, zeroY);
+      ctx.stroke();
+
+      const barWidth = Math.max(10, chartWidth / sortedOperations.length - 8);
+
+      sortedOperations.forEach((op, index) => {
+        const value = Number(op.result || 0);
+        const x = padding + (index * (chartWidth / sortedOperations.length)) + 4;
+        const barHeight = Math.abs(value) / maxAbs * (chartHeight / 2 - 8);
+        const y = value >= 0 ? zeroY - barHeight : zeroY;
+        const color = value >= 0 ? '#22c55e' : '#ef4444';
+
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, barWidth, Math.max(4, barHeight));
+
+        ctx.fillStyle = '#e5edf9';
+        ctx.font = '10px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText(formatMoney(value), x + barWidth / 2, value >= 0 ? y - 6 : y + barHeight + 14);
+
+        ctx.fillStyle = '#9eb0c8';
+        ctx.fillText(String(index + 1), x + barWidth / 2, height - 12);
       });
     }
 
@@ -896,6 +970,7 @@
       }
 
       renderCalendar(sortedOperations);
+      drawTradeBarChart(sortedOperations);
       applyView();
 
       document.querySelectorAll('.delete-btn').forEach((button) => {
@@ -1340,7 +1415,7 @@
 
     viewToggleButtons.forEach((button) => {
       button.addEventListener('click', () => {
-        currentView = button.dataset.view === 'grid' ? 'grid' : 'list';
+        currentView = ['list', 'grid', 'bar'].includes(button.dataset.view) ? button.dataset.view : 'list';
         localStorage.setItem(VIEW_STORAGE_KEY, currentView);
         applyView();
       });
